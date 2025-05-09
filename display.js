@@ -19,6 +19,8 @@ let food = [Math.floor(Math.random() * boardWidth), Math.floor(Math.random() * b
 let task = "down";
 let longTermTask = "start";
 
+let speed = 100;
+
 function setup() {
     createCanvas(boardWidth*snakeSize, boardHeight*snakeSize);
     background(currentBg);
@@ -26,7 +28,7 @@ function setup() {
 }
 
 function draw() {
-    frameRate(100);
+    frameRate(speed);
 
     // Snake AI
     ai()
@@ -54,6 +56,16 @@ function draw() {
         snake = newSnake.reverse();
     }
 
+    // Check if the snake covers the entire screen
+    if (snake.length >= boardWidth * boardHeight) {
+        // Reset the Snake
+        snake = [[Math.floor(boardWidth / 2), Math.floor(boardHeight / 2)], [Math.floor(boardWidth / 2), Math.floor(boardHeight / 2) + 1]];
+        longTermTask = "start";
+        task = "down";
+        currentSnakeCol = bg1;
+        currentBg = bg2;
+    }
+
     // Check if snake is out of bounds
     if (snake[0][0] < 0 || snake[0][0] >= boardWidth || snake[0][1] < 0 || snake[0][1] >= boardHeight) {
         // Reset the Snake
@@ -64,25 +76,24 @@ function draw() {
 
     // Check if snake has eaten food
     if (snake[0][0] === food[0] && snake[0][1] === food[1]) {
-        // Add to the snake
-        snake.push([snake[snake.length-1][0], snake[snake.length-1][1]]);
-        // Generate new food anywhere where there is no snake
-        let newFood = [Math.floor(Math.random() * boardWidth), Math.floor(Math.random() * boardHeight)];
-        while (snake.find(function(e) {
-            return e[0] === newFood[0] && e[1] === newFood[1];
-        })) {
-            print("Finding new location")
-            newFood = [Math.floor(Math.random() * boardWidth), Math.floor(Math.random() * boardHeight)];
-        }
-
-        food = newFood;
+        gen_food()
     }
 
     background(currentBg);
     fill(currentSnakeCol);
 
     for (let i = 0; i < snake.length; i++) {
-        rect(snake[i][0]*snakeSize, snake[i][1]*snakeSize, snakeSize, snakeSize);
+        // Check for consecutive vertical alignment
+        let start = i;
+        while (i + 1 < snake.length && snake[i][0] === snake[i + 1][0] && snake[i][1] + 1 === snake[i + 1][1]) {
+            i++;
+        }
+        // Draw a single rectangle for the vertical alignment
+        if (i > start) {
+            rect(snake[start][0] * snakeSize, snake[start][1] * snakeSize, snakeSize, snakeSize * (i - start + 1));
+        } else {
+            rect(snake[i][0] * snakeSize, snake[i][1] * snakeSize, snakeSize, snakeSize);
+        }
     }
 
     // Draw food
@@ -90,8 +101,43 @@ function draw() {
     rect(food[0]*snakeSize, food[1]*snakeSize, snakeSize, snakeSize);
 }
 
+let gen_food = function() {
+    // Add to the snake
+    snake.push([snake[snake.length-1][0], snake[snake.length-1][1]]);
+
+    // Generate new food anywhere where there is no snake
+    let newFood = [Math.floor(Math.random() * boardWidth), Math.floor(Math.random() * boardHeight)];
+    while (snake.find(function(e) {
+        return e[0] === newFood[0] && e[1] === newFood[1];
+    })) newFood = [Math.floor(Math.random() * boardWidth), Math.floor(Math.random() * boardHeight)];
+
+    food = newFood;
+}
+
+let navigatingToBottomRight = false;
+
+let updatePos = function() {
+    if (task === "down") dir = "s";
+    else if (task === "up") dir = "w";
+    else if (task === "left") dir = "a";
+    else if (task === "right") dir = "d";
+}
+
 let ai = function() {
-    print(longTermTask)
+    /*if (snake[0][1] === boardHeight - 1) {
+        if (snake[0][0] === 0) {
+
+        } else {
+            task = "left";
+            updatePos();
+            return;
+        }
+    }
+    if (snake[0][0] === boardWidth - 1 && snake[0][1] === boardHeight - 2) {
+        task = "down";
+        updatePos();
+        return;
+    }*/
 
     if (longTermTask === "start") {
         if (snake[0][0] === 1 && snake[0][1] === boardHeight - 1) {
@@ -119,16 +165,65 @@ let ai = function() {
                     if (snake[0][0] < food[0]) {
                         task = "right";
                     } else {
-                        task = "down";
-                        longTermTask = "start";
+                        // Return to the start
+                        if (navigatingToBottomRight !== true) {
+                            if (snake.length < (boardHeight-1)*5) {
+                                task = "down";
+                                longTermTask = "start";
+                            } else {
+                                if (snake[0][0] > boardWidth - 5) {
+                                    navigatingToBottomRight = true;
+                                    ai();
+                                } else {
+                                    task = "down";
+                                    longTermTask = "start";
+                                }
+                            }
+                        } else {
+                            if (snake[0][0] === boardWidth - 1) {
+                                task = "down";
+                                longTermTask = "start";
+                            } else {
+                                if (snake[0][0] === boardWidth - 1 && snake[0][1] === boardHeight - 1) {
+                                    task = "left"
+                                    longTermTask = "start";
+                                } else {
+                                    if (snake[0][0] % 2 === 0) {
+                                        if (snake[0][1] === boardHeight - 1) task = "right";
+                                        else task = "down";
+                                    } else {
+                                        if (snake[0][1] === boardHeight - 1) task = "down";
+                                        else task = "right";
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    if (task === "down") dir = "s";
-    else if (task === "up") dir = "w";
-    else if (task === "left") dir = "a";
-    else if (task === "right") dir = "d";
+    } /*else if (longTermTask === "bottom-right") {
+        if (snake[0][0] === boardWidth - 1) {
+            if (snake[0][1] === boardHeight + 2) {
+                // Reached the bottom right
+                longTermTask = "start";
+                task = "left";
+            }
+        } else {
+            if (snake[0][1] === 0) {
+                if (snake[0][0] % 2 !== 0) {
+                    task = "down";
+                } else {
+                    task = "right";
+                }
+            } else if (snake[0][1] === boardHeight - 2) {
+                if (snake[0][0] % 2 === 0) {
+                    task = "up";
+                } else {
+                    task = "right";
+                }
+            }
+        }
+    }*/
+    updatePos();
 }
